@@ -2,18 +2,26 @@
 
 Voice2Series: Reprogramming Acoustic Models for Time Series Classification
 
-- This a backup and please look up at (https://github.com/huckiyang/Voice2Series-Reprogramming) for more recent updates.
 
 <img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/img.png" width="500">
 
 
-- International Conference on Machine Learning (ICML), 2021 | [Paper](http://proceedings.mlr.press/v139/yang21j/yang21j.pdf) | [Colab Demo](https://colab.research.google.com/drive/18WpsEfz_qjjHcA7BVW-y9SHN3XLKT1Yq?usp=sharing)
+- International Conference on Machine Learning (ICML), 2021 | [Paper](http://proceedings.mlr.press/v139/yang21j/yang21j.pdf) | [Colab Demo](https://colab.research.google.com/drive/18WpsEfz_qjjHcA7BVW-y9SHN3XLKT1Yq?usp=sharing) | [Video](https://recorder-v3.slideslive.com/?share=39647&s=f6016dd8-cca3-4541-bbeb-568e212537d6)
 
+
+<img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/layers.png" width="750">
+
+
+- We provide an end-to-end approach (Repro. layer) to reprogram on time series data on `raw waveform` with a differential mel-spectrogram layer from kapre. 
+
+- No offiline acoustic feature extraction and all layer are differentiable.
 
 ### Environment
 
 
-tensorflow 2.2 (CUDA=10.0) and kapre 0.2.0
+Tensorflow 2.2 (CUDA=10.0) and Kapre 0.2.0. 
+
+- PyTorch noted: Echo to many interests from the community, we will also provide Pytorch V2S layers and frameworks around this September, incoperating the new torch audio layers. Feel free to email the authors for `further reprogramming collaboration`.
 
 - option 1 (from yml)
 
@@ -104,9 +112,16 @@ Epoch 2/100
 python cam_v2s.py --dataset 5 --weight wNo5_map6-88-0.7662.h5 --mapping 6 --layer conv2d_1
 ```
 
-  
- 
 <img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/results/0715_0318_ts_No5.png" width="600">
+
+### Discussion
+
+- For sliced wasserstein distance mapping and theoretical analysis, we use the [POT](https://pythonot.github.io) package ([JMLR 2021](https://www.jmlr.org/papers/volume22/20-451/20-451.pdf)). 
+
+<img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/repro_theo.png" width="500">
+
+
+- The population risk for the target task via reprogramming aK-waysource neural network classifier is upper bounded by equation above.
 
 ### Reference
 
@@ -121,13 +136,10 @@ python cam_v2s.py --dataset 5 --weight wNo5_map6-88-0.7662.h5 --mapping 6 --laye
   booktitle = 	 {Proceedings of the 38th International Conference on Machine Learning},
   pages = 	 {11808--11819},
   year = 	 {2021},
-  editor = 	 {Meila, Marina and Zhang, Tong},
   volume = 	 {139},
   series = 	 {Proceedings of Machine Learning Research},
   month = 	 {18--24 Jul},
   publisher =    {PMLR},
-  pdf = 	 {http://proceedings.mlr.press/v139/yang21j/yang21j.pdf},
-  url = 	 {http://proceedings.mlr.press/v139/yang21j.html},
 }
 
 ```
