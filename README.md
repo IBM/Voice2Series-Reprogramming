@@ -2,6 +2,7 @@
 
 Voice2Series: Reprogramming Acoustic Models for Time Series Classification
 
+## Please check https://github.com/huckiyang/speech2music for major updates.
 
 <img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/img.png" width="500">
 
@@ -143,3 +144,7 @@ python cam_v2s.py --dataset 5 --weight wNo5_map6-88-0.7662.h5 --mapping 6 --laye
 }
 
 ```
+
+### Question
+
+Please open an issue [here](https://github.com/huckiyang/Voice2Series-Reprogramming/issues/new/choose).
