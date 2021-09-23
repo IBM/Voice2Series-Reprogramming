@@ -8,7 +8,7 @@ Voice2Series: Reprogramming Acoustic Models for Time Series Classification
 <img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/img.png" width="500">
 
 
-- International Conference on Machine Learning (ICML), 2021 | [Paper](http://proceedings.mlr.press/v139/yang21j/yang21j.pdf) | [Sup](http://proceedings.mlr.press/v139/yang21j/yang21j-supp.pdf) | [Colab Demo](https://colab.research.google.com/drive/18WpsEfz_qjjHcA7BVW-y9SHN3XLKT1Yq?usp=sharing) | [Video](https://recorder-v3.slideslive.com/?share=39647&s=f6016dd8-cca3-4541-bbeb-568e212537d6) | [Slides](https://icml.cc/media/icml-2021/Slides/9059.pdf)
+- International Conference on Machine Learning (ICML), 2021 | [Paper](http://proceedings.mlr.press/v139/yang21j/yang21j.pdf) | [Sup](http://proceedings.mlr.press/v139/yang21j/yang21j-supp.pdf) | [Colab Demo](https://colab.research.google.com/drive/18WpsEfz_qjjHcA7BVW-y9SHN3XLKT1Yq?usp=sharing) | [Video](https://slideslive.com/38958989/voice2series-reprogramming-acoustic-models-for-time-series-classification?ref=speaker-18620-latest) | [Slides](https://icml.cc/media/icml-2021/Slides/9059.pdf)
 
 
 <img src="https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/img/layers.png" width="750">
@@ -41,23 +41,24 @@ pip install h5py==2.10.0
 
 ### Training
 
-- This is tengible Version. Please also check the paper for actual validation details. Many Thanks!
+- Random Mapping 
+
+Please also check the paper for actual validation details. Many Thanks!
+
 
 ```python
-python v2s_main.py --dataset 0 --eps 100 --mapping 3
+python v2s_main.py --dataset 0 --eps 5 --mod 0
 ```
 
 
 - Result
 
-```shell
-seg idx: 0 --> start: 0, end: 500
+```shellseg idx: 0 --> start: 0, end: 500
 seg idx: 1 --> start: 5000, end: 5500
 seg idx: 2 --> start: 10000, end: 10500
 Tensor("AddV2_2:0", shape=(None, 16000, 1), dtype=float32)
 --- Preparing Masking Matrix
 Model: "model_1"
-__________________________________________________________________________________________________
 Layer (type)                    Output Shape         Param #     Connected to                     
 ==================================================================================================
 input_1 (InputLayer)            [(None, 500, 1)]     0                                            
@@ -81,6 +82,58 @@ ________________________________________________________________________________
 reshape_1 (Reshape)             (None, 16000)        0           art_layer[0][0]                  
 __________________________________________________________________________________________________
 model (Model)                   (None, 36)           1292911     reshape_1[0][0]                  
+==================================================================================================
+Total params: 1,308,911
+Trainable params: 16,000
+Non-trainable params: 1,292,911
+__________________________________________________________________________________________________
+Epoch 1/5
+2021-09-21 00:39:41.269756: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10
+2021-09-21 00:39:41.497716: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+113/113 [==============================] - 6s 49ms/step - loss: 5.0755 - accuracy: 0.9431 - val_loss: 3.7315 - val_accuracy: 0.9985
+Epoch 2/5
+113/113 [==============================] - 4s 39ms/step - loss: 3.1852 - accuracy: 0.9939 - val_loss: 2.7873 - val_accuracy: 0.9902
+Epoch 3/5
+113/113 [==============================] - 4s 39ms/step - loss: 2.5128 - accuracy: 0.9989 - val_loss: 2.2929 - val_accuracy: 0.9985
+Epoch 4/5
+113/113 [==============================] - 4s 39ms/step - loss: 2.1230 - accuracy: 0.9994 - val_loss: 1.9733 - val_accuracy: 0.9992
+Epoch 5/5
+113/113 [==============================] - 4s 38ms/step - loss: 1.8629 - accuracy: 0.9997 - val_loss: 1.7518 - val_accuracy: 1.0000
+--- Train loss: 1.7529315948486328
+- Train accuracy: 1.0
+--- Test loss: 1.7516217231750488
+- Test accuracy: 1.0
+=== Best Val. Acc:  1.0  At Epoch of  4
+
+```
+
+- Many-to-one Label Mapping
+
+```python
+python v2s_main.py --dataset 0 --eps 5 --mapping 3 --mod 1
+```
+
+- Results
+
+```shell
+seg idx: 0 --> start: 0, end: 500
+Tensor("AddV2:0", shape=(None, 16000, 1), dtype=float32)
+--- Preparing Masking Matrix
+Model: "model_1"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+input_1 (InputLayer)            [(None, 500, 1)]     0                                            
+__________________________________________________________________________________________________
+zero_padding1d (ZeroPadding1D)  (None, 16000, 1)     0           input_1[0][0]                    
+__________________________________________________________________________________________________
+tf_op_layer_AddV2 (TensorFlowOp [(None, 16000, 1)]   0           zero_padding1d[0][0]             
+__________________________________________________________________________________________________
+art_layer (ARTLayer)            (None, 16000, 1)     16000       tf_op_layer_AddV2[0][0]          
+__________________________________________________________________________________________________
+reshape_1 (Reshape)             (None, 16000)        0           art_layer[0][0]                  
+__________________________________________________________________________________________________
+model (Model)                   (None, 36)           1292911     reshape_1[0][0]                  
 __________________________________________________________________________________________________
 tf_op_layer_MatMul (TensorFlowO [(None, 6)]          0           model[1][0]                      
 __________________________________________________________________________________________________
@@ -96,15 +149,26 @@ ________________________________________________________________________________
 tf_op_layer_Mean (TensorFlowOpL [(None, 2)]          0           tf_op_layer_Reshape_2[0][0]      
 ==================================================================================================
 Total params: 1,308,911
-Trainable params: 217,225
-Non-trainable params: 1,091,686
+Trainable params: 16,000
+Non-trainable params: 1,292,911
 __________________________________________________________________________________________________
-Epoch 1/100
-2021-07-19 01:43:32.690913: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10
-2021-07-19 01:43:32.919343: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
-113/113 [==============================] - 6s 50ms/step - loss: 0.0811 - accuracy: 1.0000 - val_loss: 1.5589e-04 - val_accuracy: 1.0000
-Epoch 2/100
-113/113 [==============================] - 5s 41ms/step - loss: 5.0098e-05 - accuracy: 1.0000 - val_loss: 1.0906e-05 - val_accuracy: 1.0000
+Epoch 1/5
+2021-09-21 01:23:21.163046: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10
+2021-09-21 01:23:21.389418: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+113/113 [==============================] - 5s 48ms/step - loss: 2.0503 - accuracy: 1.0000 - val_loss: 1.3729 - val_accuracy: 1.0000
+Epoch 2/5
+113/113 [==============================] - 4s 40ms/step - loss: 1.1730 - accuracy: 1.0000 - val_loss: 1.0234 - val_accuracy: 1.0000
+Epoch 3/5
+113/113 [==============================] - 4s 40ms/step - loss: 0.9352 - accuracy: 1.0000 - val_loss: 0.8614 - val_accuracy: 1.0000
+Epoch 4/5
+113/113 [==============================] - 4s 40ms/step - loss: 0.8044 - accuracy: 1.0000 - val_loss: 0.7538 - val_accuracy: 1.0000
+Epoch 5/5
+113/113 [==============================] - 4s 39ms/step - loss: 0.7154 - accuracy: 1.0000 - val_loss: 0.6810 - val_accuracy: 1.0000
+--- Train loss: 0.680957019329071
+- Train accuracy: 1.0
+--- Test loss: 0.6809701919555664
+- Test accuracy: 1.0
+=== Best Val. Acc:  1.0  At Epoch of  0
 ```
 
 
@@ -131,7 +195,7 @@ python cam_v2s.py --dataset 5 --weight wNo5_map6-88-0.7662.h5 --mapping 6 --laye
 
 - 1. Tips for tuning the model?
 
-I would recommend using different label mapping numbers for training. For instance, you could use `--mapping 7` for `ECG 5000` dataset. The dropout rate is also an important hyperparameter for tuning the testing loss. You could use a range between `0.2` to `0.5` in this [line](https://github.com/huckiyang/Voice2Series-Reprogramming/blob/main/ts_model.py#L72).
+I would recommend using different label mapping numbers for training. For instance, you could use `--mapping 7` for `ECG 5000` dataset. The dropout rate is also an important hyperparameter for tuning the testing loss. You could use a range between `0.2` to `0.5` with `--dr 4` for `0.4` dropout rate.
 
 - 2. Masking the target sequence is important?
 
@@ -146,7 +210,7 @@ Yes, you are welcome. Please send an email to the author for potential collabera
 
 - Voice2Series: Reprogramming Acoustic Models for Time Series Classification
 
-Please consider referencing the paper if you find this work helpful or relative to your research. 
+Please consider to reference the paper if you find this work helpful or relative to your research. The draft was done in Jan 2021; the project started in Sep 2020.
 
 
 ```bib
