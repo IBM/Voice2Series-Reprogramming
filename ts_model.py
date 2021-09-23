@@ -1,145 +1,140 @@
 # CHH Yang et al. 2021 (http://proceedings.mlr.press/v139/yang21j/yang21j.pdf)
 # Apache Apache-2.0 License
 
+
+from tensorflow.keras.layers import Dense, ZeroPadding1D, Reshape
 import tensorflow as tf
-import kapre
-from tensorflow.keras.models import Model, load_model
-from kapre.time_frequency import Melspectrogram, Spectrogram
-from tensorflow.keras.layers import ZeroPadding2D, Input, Layer, ZeroPadding1D, Reshape, Permute
-from tensorflow.keras import initializers,regularizers
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-import tensorflow.keras.backend as K
-from kapre.utils import Normalization2D
-from SpeechModels import AttRNNSpeechModel
-import numpy as np
-from utils import multi_mapping
 from tensorflow import keras
+import tensorflow.keras.backend as K
+import numpy as np
+## time series NN models
+from ts_model import AttRNN_Model, ARTLayer, WARTmodel, make_model
+from ts_dataloader import readucr, plot_acc_loss
+# from vggish.model import Vggish_Model
+import argparse
 
-print("tensorflow vr. ", tf.__version__, "kapre vr. ",kapre.__version__)
+# Learning phase is set to 0 since we want the network to use the pretrained moving mean/var
+K.clear_session()
+# K.set_learning_phase(0)
 
-def AttRNN_Model():
-
-    nCategs=36
-    sr=16000
-    #iLen=16000
-
-    model = AttRNNSpeechModel(nCategs, samplingrate = sr, inputLength = None)
-    model.compile(optimizer='adam', loss=['sparse_categorical_crossentropy'], metrics=['sparse_categorical_accuracy'])
-    model.load_weights('weight/pr_attRNN.h5')
-    # model = load_model('weight/model-attRNN.h5', custom_objects={'Melspectrogram': Melspectrogram, 'Normalization2D': Normalization2D })
-
-    # x = np.random.rand(32,16000)
-    # print(model.predict(x).shape)
-    
-    return model
-
-# model.summary()
-
-# Adverserial Reprogramming layer
-class ARTLayer(Layer):
-    def __init__(self, tar_1ds, mod = 0, drop_rate=0.4, W_regularizer=0.05, **kwargs):
-        self.init = initializers.get('glorot_uniform')
-        self.W_regularizer = regularizers.l2(W_regularizer)
-        self.tar_1ds = tar_1ds
-        self.mod = mod
-        self.dr_rate = drop_rate
-        super(ARTLayer, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        assert len(input_shape) == 3
-        # Create a trainable weight variable for this layer.
-        self.W = self.add_weight(name='kernel', 
-                                      shape=(16000,1),
-                                      initializer=self.init, regularizer=self.W_regularizer,
-                                      trainable=True)
-        # Masking matrix
-        print("--- Preparing Masking Matrix")
-        ### pad at beginning
-        if self.mod == 0:
-            self.M = np.ones((16000,1)).astype('float32')
-            self.M[0:self.tar_1ds,0] = 0
-        
-        elif self.mod == 1:
-            ### pad at center
-            self.M_center = np.zeros((1,self.tar_1ds)).astype('float32')
-            maxlen1 = np.int(np.floor((16000-self.tar_1ds)/2) + self.tar_1ds) 
-            maxlen2 = 16000
-            self.pre_M = pad_sequences(self.M_center, maxlen=maxlen1, dtype='float32', padding='pre', value=1.0) #111...111[tar]
-            self.pos_M = pad_sequences(self.pre_M, maxlen=maxlen2, dtype='float32', padding='post', value=1.0) #111...111[tar]111...111
-        # tmp_indices = tf.where(tf.equal(self.pos_M, 0.0))
-        # assert tf.reduce_sum(tmp_indices[0]) == np.int(np.floor((16000-self.tar_1ds)/2)) 
-            self.M = tf.transpose(self.pos_M)
-
-        super(ARTLayer, self).build(input_shape)  # Make layer
-
-    def call(self, x):
-        prog = K.dropout(self.W, self.dr_rate) # remove K.tanh
-        out = x + prog
-        return out
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0],input_shape[1], input_shape[2])
-
-def SegZeroPadding1D(orig_x, seg_num, orig_xlen):
-    src_xlen = 16000
-    all_seg = src_xlen//orig_xlen
-    seg_len = np.int(np.floor(all_seg//seg_num))
-    aug_x = tf.zeros([src_xlen,1])
-    for s in range(seg_num):
-        startidx = (s*seg_len)*orig_xlen
-        endidx = (s*seg_len)*orig_xlen + orig_xlen
-        print('seg idx: {} --> start: {}, end: {}'.format(s, startidx, endidx))
-    
-        seg_x = ZeroPadding1D(padding=(startidx, src_xlen-endidx))(orig_x)
-        aug_x += seg_x
-    print(aug_x)
-    return aug_x
-
-# White Adversairal Reprogramming Time Series (WART) Model 
-def WARTmodel(input_shape, pr_model, source_classes, mapping_num, target_classes, mod = 0, seg_num =3, drop_rate=0.4):
-    x = Input(shape=input_shape)
-    x_aug = SegZeroPadding1D(x, seg_num, input_shape[0])
-    # x1 = ZeroPadding1D(padding=(0, 16000-input_shape[0]))(x)
-    # x2 = ZeroPadding1D(padding=(16000-input_shape[0], 0))(x)
-    # x3 = ZeroPadding1D(padding=(np.int(np.floor((16000-input_shape[0])/2)), np.int(np.floor((16000-input_shape[0])/2))))(x)
-    # x_aug = x1 + x2 + x3
-    out = ARTLayer(input_shape[0], mod = mod)(x_aug) # e.g., input_shape[0] = 500 for FordA
-    out = Reshape([16000,])(out)
-    probs = pr_model(out)   
-    
-    if mod != 0:
-        probs = multi_mapping(probs, source_classes, mapping_num, target_classes)
-    
-    model = Model(inputs=x, outputs= probs)
-
-    # Freezing pre-trained model
-    if mod == 0:
-        model.layers[-1].trainable = False
-    elif mod == 1:
-        model.layers[-7].trainable = False
-    elif mod == 2:
-        model.layers[-1].trainable = True # new setup after ICML 21, which allows reprogramming with fine-tuning.
-
-    return model
+parser = argparse.ArgumentParser()
+parser.add_argument("--mod", type = int, default = 0, help = "Single input seq (0), multiple input aug (1), repro w/ TF (2)")
+parser.add_argument("--net", type = int, default = 0, help = "Pretrained (0), AttRNN (#32), (1) VGGish (#512)")
+parser.add_argument("--dataset", type = int, default = 0, help = "Ford-A (0), Beef (1), ECG200 (2), Wine (3), Earthquakes (4), Worms (5), Distal (6), Outline Correct (7), ECG-5k (8), ArrowH (9), CBF (10), ChlorineCon (11)")
+parser.add_argument("--mapping", type= int, default=1, help = "number of multi-mapping")
+parser.add_argument("--eps", type = int, default = 100, help = "Epochs") 
+parser.add_argument("--per", type = int, default = 0, help = "save weight per N epochs")
+parser.add_argument("--dr", type=int, default = 4, help = "drop out rate")
+parser.add_argument("--seg", type=int, default = 1, help = "seg padding number")
+args = parser.parse_args()
 
 
-def make_model(input_shape, num_classes):
-    input_layer = keras.layers.Input(input_shape)
+x_train, y_train, x_test, y_test = readucr(args.dataset)
 
-    conv1 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(input_layer)
-    conv1 = keras.layers.BatchNormalization()(conv1)
-    conv1 = keras.layers.ReLU()(conv1)
+classes = np.unique(np.concatenate((y_train, y_test), axis=0))
 
-    conv2 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv1)
-    conv2 = keras.layers.BatchNormalization()(conv2)
-    conv2 = keras.layers.ReLU()(conv2)
+x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+x_test = x_test.reshape((x_test.shape[0], x_test.shape[1], 1))
 
-    conv3 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv2)
-    conv3 = keras.layers.BatchNormalization()(conv3)
-    conv3 = keras.layers.ReLU()(conv3)
+# Note for cross validation to report a new time series results. Please refer to the cross-validation and "only use the training loss" to tune the model.
+# (Dau et al., 2019) and (Wang et al., 2017) cited in the V2S paper
+# The x_test and y_test are the official validation set in the UCR.
 
-    gap = keras.layers.GlobalAveragePooling1D()(conv3)
+num_classes = len(np.unique(y_train))
 
-    output_layer = keras.layers.Dense(num_classes, activation="softmax")(gap)
+if np.min(np.unique(y_train))!=0: #for those tasks with labels not start from 0, shift to 0 
+    y_train%=num_classes 
+    y_test%=num_classes
 
-    return keras.models.Model(inputs=input_layer, outputs=output_layer)
+idx = np.random.permutation(len(x_train))
+x_train = x_train[idx]
+y_train = y_train[idx]
+
+y_train[y_train == -1] = 0
+y_test[y_test == -1] = 0
+
+print("--- X shape : ", x_train[0].shape, "--- Num of Classes : ", num_classes) ## target class
+
+
+## Pre-trained Model for Adv Program  
+if args.net == 0:
+    pr_model = AttRNN_Model()
+elif args.net == 1:
+    pr_model = Vggish_Model()
+elif args.net == 2: # audio-set
+    pr_model = VGGish_Model(audioset = True)
+elif args.net == 3: # unet
+    pr_model = AttRNN_Model(unet= True)
+
+
+# pr_model.summary()
+
+## # of Source classes in Pre-trained Model
+if args.net == 0: ## choose pre-trained network 
+    source_classes = 36 ## Google Speech Commands
+elif args.net == 2:
+    source_classes = 128 ## AudioSet by VGGish
+else:
+    source_classes = 512 ## VGGish feature num
+
+target_shape = x_train[0].shape
+
+## Adv Program Time Series (ART)
+mapping_num = args.mapping
+seg_num = args.seg
+drop_rate = args.dr*0.1
+
+try:
+    assert mapping_num*num_classes <= source_classes
+except AssertionError:
+    print("Error: The mapping num should be smaller than source_classes / num_classes: {}".format(source_classes//num_classes)) 
+    exit(1)
+
+model = WARTmodel(target_shape, pr_model, source_classes, mapping_num, num_classes, args.mod, seg_num, drop_rate)
+# else:
+# model = pr_model # define for transfer learning
+
+
+## Loss
+adam = tf.keras.optimizers.Adam(lr=0.05,decay=0.48)
+save_path = "weight/" + "beta/No" + str(args.dataset) +"_map" + str(args.mapping) + "-{epoch:02d}-{val_accuracy:.4f}.h5"
+if args.per!= 0:
+    checkpoints = tf.keras.callbacks.ModelCheckpoint(save_path, save_weights_only=True, period=args.per)
+    exp_callback = [tf.keras.callbacks.EarlyStopping(patience=500), checkpoints]
+else:
+    exp_callback = [tf.keras.callbacks.EarlyStopping(patience=500)]
+
+
+model.compile(loss='categorical_crossentropy', optimizer = adam, metrics=['accuracy'])
+
+model.summary()
+
+batch_size = 32
+epochs = args.eps
+
+# convert class vectors to binary class matrices
+if args.mod == 0: # single input w/ random mapping
+    y_train = keras.utils.to_categorical(y_train, source_classes)
+    y_test = keras.utils.to_categorical(y_test, source_classes)
+else: # with many to one mapping
+    y_train = keras.utils.to_categorical(y_train, num_classes)
+    y_test = keras.utils.to_categorical(y_test, num_classes)
+
+
+exp_history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, verbose=1,
+          validation_data=(x_test,y_test), callbacks= exp_callback)
+
+score = model.evaluate(x_train, y_train, verbose=0)
+print('--- Train loss:', score[0])
+print('- Train accuracy:', score[1])
+
+score = model.evaluate(x_test, y_test, verbose=0)
+print('--- Test loss:', score[0])
+print('- Test accuracy:', score[1])
+
+
+print("=== Best Val. Acc: ", max(exp_history.history['val_accuracy']), " At Epoch of ", np.argmax(exp_history.history['val_accuracy']))
+
+plot_acc_loss(exp_history, str(args.eps), str(args.dataset), str(args.mapping))
+
+
