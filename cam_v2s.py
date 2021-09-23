@@ -1,5 +1,5 @@
 # Original CAM Code is modified from Yang et al. ICASSP 2021 (https://arxiv.org/pdf/2010.13309.pdf)
-# Please consider to cite both de Andrade et al. 2018 and Yang et al. 2021, if you use the attention heads and CAM visualization.
+# Please consider to cite both de Andrade et al. 2018 and Yang et al. 2021 ICML, if you use the attention heads and CAM visualization.
 
 from ts_model import  AttRNN_Model, ARTLayer, WARTmodel
 import numpy as np
@@ -92,7 +92,7 @@ num_classes = len(np.unique(y_train))
 x_test = x_test.reshape((x_test.shape[0], x_test.shape[1], 1))
 target_shape = x_test[0].shape
 
-art_model = WARTmodel(target_shape, model, 36,  args.mapping, num_classes)
+art_model = WARTmodel(target_shape, model, 36,  args.mapping, num_classes, mod=2)
 art_model.load_weights("weight/"+ args.weight)
 
 
