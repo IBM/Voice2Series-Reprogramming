@@ -1,4 +1,3 @@
-# CHH Yang et al. 2021 (http://proceedings.mlr.press/v139/yang21j/yang21j.pdf)
 # Apache Apache-2.0 License
 
 import tensorflow as tf
@@ -10,20 +9,20 @@ from tensorflow.keras import initializers,regularizers
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow.keras.backend as K
 from kapre.utils import Normalization2D
-from SpeechModels import AttRNNSpeechModel
+from SpeechModels import AttRNNSpeechModel, VggishModel
 import numpy as np
 from utils import multi_mapping
 from tensorflow import keras
 
 print("tensorflow vr. ", tf.__version__, "kapre vr. ",kapre.__version__)
 
-def AttRNN_Model():
+def AttRNN_Model(unet= False):
 
     nCategs=36
     sr=16000
     #iLen=16000
 
-    model = AttRNNSpeechModel(nCategs, samplingrate = sr, inputLength = None)
+    model = AttRNNSpeechModel(nCategs, samplingrate = sr, inputLength = None, unet= False)
     model.compile(optimizer='adam', loss=['sparse_categorical_crossentropy'], metrics=['sparse_categorical_accuracy'])
     model.load_weights('weight/pr_attRNN.h5')
     # model = load_model('weight/model-attRNN.h5', custom_objects={'Melspectrogram': Melspectrogram, 'Normalization2D': Normalization2D })
@@ -34,6 +33,15 @@ def AttRNN_Model():
     return model
 
 # model.summary()
+
+def VGGish_Model(audioset=False):
+    # nCategs=36
+    # iLen=16000
+    model = VggishModel(audioset = audioset)
+    model.compile(optimizer='adam', loss=['sparse_categorical_crossentropy'], metrics=['sparse_categorical_accuracy'])
+    if audioset == False:
+        model.load_weights('weight/pr_vggish9405.h5')
+    return model
 
 # Adverserial Reprogramming layer
 class ARTLayer(Layer):

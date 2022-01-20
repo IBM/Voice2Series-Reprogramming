@@ -1,16 +1,12 @@
-# CHH Yang et al. 2021 (http://proceedings.mlr.press/v139/yang21j/yang21j.pdf)
 # Apache Apache-2.0 License
-
-
 from tensorflow.keras.layers import Dense, ZeroPadding1D, Reshape
 import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.backend as K
 import numpy as np
 ## time series NN models
-from ts_model import AttRNN_Model, ARTLayer, WARTmodel, make_model
+from ts_model import AttRNN_Model, ARTLayer, WARTmodel, make_model, VGGish_Model
 from ts_dataloader import readucr, plot_acc_loss
-# from vggish.model import Vggish_Model
 import argparse
 
 # Learning phase is set to 0 since we want the network to use the pretrained moving mean/var
@@ -31,13 +27,15 @@ args = parser.parse_args()
 
 x_train, y_train, x_test, y_test = readucr(args.dataset)
 
+if args.dataset == 2: # fix the public code error for ECG 200 reported by Yi Zhuang 
+    y_train[y_train == -1] = 0
+    y_test[y_test == -1] = 0 
+
 classes = np.unique(np.concatenate((y_train, y_test), axis=0))
 
 x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
 x_test = x_test.reshape((x_test.shape[0], x_test.shape[1], 1))
 
-# Note for cross validation to report a new time series results. Please refer to the cross-validation and "only use the training loss" to tune the model.
-# (Dau et al., 2019) and (Wang et al., 2017) cited in the V2S paper
 # The x_test and y_test are the official validation set in the UCR.
 
 num_classes = len(np.unique(y_train))
@@ -59,9 +57,9 @@ print("--- X shape : ", x_train[0].shape, "--- Num of Classes : ", num_classes) 
 ## Pre-trained Model for Adv Program  
 if args.net == 0:
     pr_model = AttRNN_Model()
-elif args.net == 1:
-    pr_model = Vggish_Model()
-elif args.net == 2: # audio-set
+elif args.net == 1: # fine-tuning with additive dense layer
+    pr_model = VGGish_Model()
+elif args.net == 2: # audio-set output classes  = 128
     pr_model = VGGish_Model(audioset = True)
 elif args.net == 3: # unet
     pr_model = AttRNN_Model(unet= True)
@@ -70,7 +68,7 @@ elif args.net == 3: # unet
 # pr_model.summary()
 
 ## # of Source classes in Pre-trained Model
-if args.net == 0: ## choose pre-trained network 
+if args.net != 2: ## choose pre-trained network 
     source_classes = 36 ## Google Speech Commands
 elif args.net == 2:
     source_classes = 128 ## AudioSet by VGGish
@@ -83,6 +81,10 @@ target_shape = x_train[0].shape
 mapping_num = args.mapping
 seg_num = args.seg
 drop_rate = args.dr*0.1
+
+pr_model.summary()
+
+
 
 try:
     assert mapping_num*num_classes <= source_classes
